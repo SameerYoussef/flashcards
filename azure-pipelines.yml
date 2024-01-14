@@ -11,6 +11,7 @@ jobs:
   steps:
   - task: AzureStaticWebApp@0
     inputs:
-      app_location: '/' # Change this to the location of your app files
-      output_location: '$(System.DefaultWorkingDirectory)/' # Change this if your build output is in a different folder
+      skip_app_build: true
+      skip_api_build: true
+      output_location: '$(System.DefaultWorkingDirectory)/'
       azure_static_web_apps_api_token: $(WEB_APPS_API_TOKEN)
