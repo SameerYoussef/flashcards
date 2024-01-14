@@ -3,6 +3,9 @@ trigger:
   
 pool: 'Azure Pipelines'
 
+variables:
+  AZURE_STATIC_WEB_APPS_API_TOKEN: $(AZURE_STATIC_WEB_APPS_API_TOKEN)
+
 jobs:
 - job: 'BuildAndDeploy'
   steps:
