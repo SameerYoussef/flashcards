@@ -1,0 +1,14 @@
+trigger:
+  - main
+  
+pool:
+  vmImage: 'ubuntu-latest'
+
+jobs:
+- job: 'BuildAndDeploy'
+  steps:
+  - task: AzureStaticWebApp@0
+    inputs:
+      app_location: '/' # Change this to the location of your app files
+      output_location: '$(System.DefaultWorkingDirectory)/' # Change this if your build output is in a different folder
+      azure_static_web_apps_api_token: $(AZURE_STATIC_WEB_APPS_API_TOKEN)

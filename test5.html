@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Language Cards</title>
+  <script src="msal-browser-v3.6.0.min.js"></script>
+  <style>
+    body {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 20px;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .card {
+      position: relative;
+      width: 120px;
+      height: 100px;
+      background-color: #d6db47;
+      /* Pastel Blue */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: transform 0.5s, background-color 0.5s, box-shadow 0.3s;
+      border-radius: 10px;
+      /* Rounded corners */
+      box-shadow: 3px 3px 5px #888888;
+      /* Drop shadow */
+    }
+
+    .card.flipped {
+      transform: rotateY(180deg);
+      background-color: #42e46b;
+      /* Pastel Green */
+    }
+
+    .card.flipped .content {
+      transform: rotateY(180deg);
+    }
+
+    .card.yellow {
+      background-color: #ffa07a;
+      /* Pastel Yellow */
+    }
+
+    .content {
+      transition: transform 0.5s;
+    }
+
+    .tooltip {
+      position: absolute;
+      background-color: #fbff00;
+      /* Orange */
+      padding: 5px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      max-width: 200px;
+      display: none;
+      z-index: 1;
+    }
+
+    .tooltip.flipped {
+      transform: rotateY(180deg);
+    }
+
+    #menu {
+      position: fixed;
+      top: 0px;
+      left: 0px;
+      background-color: #ddd;
+      color: #000000;
+      border: 1px solid #ccc;
+      padding: 2px;
+      cursor: pointer;
+      z-index: 2;
+      border-radius: 0px;
+    }
+
+    #menu-options {
+      display: none;
+      position: fixed;
+      top: 30px;
+      left: 0px;
+      background-color: #ddd;
+      border: 1px solid #888;
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+      padding: 5px;
+      z-index: 2;
+      border-radius: 0px;
+    }
+
+    #menu-options ul {
+      list-style-type: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    #menu-options li {
+      padding: 2px;
+      cursor: pointer;
+      border-bottom: 1px solid #888;
+    }
+
+    #menu-options li:hover {
+      background-color: #888;
+    }
+
+    #about-dialog {
+      display: none;
+      position: fixed;
+      top: 50px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: #ddd;
+      padding: 20px;
+      border: 1px solid #888;
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+      z-index: 3;
+    }
+
+    #close-about-dialog {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      cursor: pointer;
+    }
+
+    #toast {
+      position: fixed;
+      top: -50px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: #FADA5E;
+      /* Pastel yellow */
+      padding: 15px;
+      border-radius: 8px;
+      color: #333;
+      font-weight: bold;
+      transition: top 0.5s ease-out;
+      z-index: 999;
+    }
+
+    /* Additional styles for different toast states */
+    #toast.success {
+      background-color: #A2D9A8;
+      /* Pastel green */
+    }
+
+    #toast.error {
+      background-color: #F28985;
+      /* Pastel red */
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- New HTML for the menu button -->
+  <div id="menu">⌘</div>
+
+  <!-- New HTML for the menu options and about dialog -->
+  <div id="menu-options">
+    <ul>
+      <li onclick="resetCards()">Reset</li>
+      <li onclick="saveCards(false)">Local Save</li>
+      <li onclick="restoreCards(false)">Local Restore</li>
+      <li onclick="login()" id="login-button">Log in</li>
+      <li onclick="saveCards(true)">Online Save</li>
+      <li onclick="restoreCards(true)">Online Restore</li>
+      <li onclick="logout()" id="logout-button">Log out (<span id="users-name">TBC</span>)</li>
+      <li onclick="toggleTooltips()">Tooltips <span id="tooltip-status">(on)</span></li>
+      <li onclick="showAbout()">About</li>
+    </ul>
+  </div>
+
+  <div id="about-dialog">
+    <div id="close-about-dialog" onclick="closeAbout()">X</div>
+    <h2>Flashcard World</h2>
+    <p>Thanks for using this app.</p>
+    <p>Contact: sameer@technomark.ch</p>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    /*
+    *  Code related to login and logout
+    */
+    const config = {
+      auth: {
+        clientId: '96845d58-f0e0-4264-890a-d46f08fdd3f1',
+        authority: 'https://flashcardlearner.b2clogin.com/flashcardlearner.onmicrosoft.com/B2C_1_simple',
+        redirectUri: 'http://localhost:8080/msal2.html',
+        knownAuthorities: ["flashcardlearner.b2clogin.com"],
+        validateAuthority: false,
+        navigateToLoginRequestUrl: true,
+      },
+      cache: {
+        cacheLocation: "localStorage",
+        storeAuthStateInCookie: false
+      }
+    };
+
+    var myMSAL;
+    var accessToken;
+
+    function showToast(message, type) {
+      var toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.className = type;
+      toast.style.top = '10px'; // Show the toast
+      setTimeout(function () {
+        toast.style.top = '-50px'; // Hide the toast after 2 seconds
+      }, 2000);
+    }
+
+    function login() {
+      const loginRequest = {
+        scopes: [config.auth.clientId],
+      };
+      showToast('Logging in...', '');
+      myMSAL.acquireTokenPopup(loginRequest)
+        .then(response => {
+          showToast('Login succeeded!', 'success');
+          accessToken = response.accessToken;
+          handleLoginSuccess(response.idTokenClaims.given_name, accessToken);
+        })
+        .catch(error => {
+          showToast('Login error :( ' + error, 'error');
+          handleLogoutSuccess();
+        });
+    }
+
+    function logout() {
+      showToast('Logging out...', '');
+      myMSAL.logoutPopup()
+        .then(() => {
+          accessToken = undefined;
+          showToast('Logout succeeded!', 'success');
+          handleLogoutSuccess();
+        })
+        .catch(error => {
+          showToast('Logout error :( ' + error, 'error');
+        });
+    }
+
+    function handleLoginSuccess(name, uniqueId) {
+      showToast(`Welcome ${name}!`, 'success');
+      document.getElementById("login-button").style.display = "none";
+      document.getElementById("logout-button").style.display = "block";
+      document.getElementById("users-name").innerText = name;
+    }
+
+    function handleLogoutSuccess() {
+      showToast('See ya!', 'success');
+      document.getElementById("login-button").style.display = "block";
+      document.getElementById("logout-button").style.display = "none";
+      document.getElementById("users-name").innerText = '';
+    }
+
+    function setUpLoginState() {
+      showToast('Initializing', '');
+      myMSAL = new msal.PublicClientApplication(config);
+      myMSAL.initialize().then(() => {
+        let accounts = myMSAL.getAllAccounts(); // Check if we're already logged in
+
+        if (accounts.length > 0) { // YES - refresh token
+          const accessTokenRequest = {
+            scopes: [config.auth.clientId],
+            account: accounts[0],
+          };
+
+          myMSAL
+            .acquireTokenSilent(accessTokenRequest)
+            .then(function (accessTokenResponse) {
+              accessToken = accessTokenResponse.accessToken;
+              let givenName = accessTokenResponse.idTokenClaims.given_name;
+              handleLoginSuccess(givenName, accessToken);
+            })
+            .catch(function (error) { // Cannot refresh token - prompt for login
+              login();
+            });
+        } else {  // NO - assume logout state
+          handleLogoutSuccess();
+        }
+      });
+    }
+
+    setUpLoginState();
+  </script>
+
+  <script>
+
+    var dataJson;
+    document.addEventListener('DOMContentLoaded', function () {
+      fetch('data4.json')
+        .then(response => response.json())
+        .then(data => {
+          dataJson = data;
+          const container = document.body;
+          const tooltip = createToolTip();
+          document.body.appendChild(tooltip);
+
+          data.forEach(item => {
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.id = item.id;
+
+            card.addEventListener('click', () => toggleCard(card, item.en, item.de, item.enEx, item.deEx));
+            card.addEventListener('mouseover', () => showToolTip(tooltip, item.enEx, item.deEx, card));
+            card.addEventListener('mouseout', () => hideToolTip(tooltip));
+            card.addEventListener('mousemove', (event) => updateToolTipPosition(event, tooltip, item.enEx, item.deEx, card));
+
+            const content = document.createElement('div');
+            content.className = 'content';
+            content.en = item.en;
+            content.de = item.de;
+            content.innerText = content.de;
+
+            card.appendChild(content);
+            container.appendChild(card);
+          });
+          showToast('Initialising...');
+        });
+
+      function toggleCard(card, translationEn, translationDe, en, de) {
+        card.classList.toggle('flipped');
+        const content = card.querySelector('.content');
+        content.innerText = card.classList.contains('flipped') ? translationEn : translationDe;
+
+        if (card.classList.contains('flipped')) {
+          card.classList.remove('yellow');
+        } else {
+          card.classList.add('yellow');
+        }
+
+        const tooltip = document.querySelector('.tooltip');
+        updateToolTipText(tooltip, card, en, de);
+      }
+
+      function showToolTip(tooltip, translationEnEx, translationDeEx, card) {
+        if (document.getElementById('tooltip-status').innerText == '(off)') {
+          return;
+        }
+        tooltip.innerText = card.classList.contains('flipped') ? translationEnEx : translationDeEx;
+        tooltip.style.display = 'block';
+      }
+
+      function hideToolTip(tooltip) {
+        tooltip.style.display = 'none';
+      }
+
+      function createToolTip() {
+        const tooltip = document.createElement('div');
+        tooltip.className = 'tooltip';
+        return tooltip;
+      }
+
+      function updateToolTipPosition(event, tooltip, en, de, card) {
+        updateToolTipText(tooltip, card, en, de);
+        const x = event.clientX;
+        const y = event.pageY;
+        tooltip.style.left = x + 20 + 'px';
+        tooltip.style.top = y + 20 + 'px';
+      }
+
+      function updateToolTipText(tooltip, card, en, de) {
+        if (card.classList.contains('flipped')) {
+          tooltip.innerText = en;
+        } else {
+          tooltip.innerText = de;
+        }
+      }
+    });
+
+    function toggleMenu(menuOptions) {
+      menuOptions.style.display = getComputedStyle(document.getElementById('menu-options')).display === 'none' ? 'block' : 'none';
+    }
+
+    const menuOptions = document.getElementById('menu-options');
+    const menuButton = document.getElementById('menu');
+    menuButton.addEventListener('click', () => toggleMenu(menuOptions));
+
+    const aboutDialog = document.getElementById('about-dialog');
+
+    function resetCards() {
+      const cards = document.querySelectorAll('.card');
+      cards.forEach((card, index) => {
+        card.classList.remove('flipped', 'yellow');
+        const content = card.querySelector('.content');
+        content.innerText = dataJson[index].de;
+      });
+    }
+
+    async function restoreCards(online) {
+      let savedState;
+      if (online) {
+        showToast('Loading cards...', '');
+        let response;
+        // fetch('https://http-get-date-1.azurewebsites.net/api/flashcardapi',
+        try {
+          response = await fetch('http://localhost:7071/api/flashcardapi',
+            {
+              headers: { 'authorization': `Bearer ${accessToken}` }
+            });
+          const responseText = await new Response(response.body).text();
+          if (response.status === 401) {
+            login();
+          }
+          else if (response.status != 200) {
+            throw new Error(`Error ${response.status}: ${responseText.substring(0, 20)}`);
+          }
+          savedState = JSON.parse(responseText);
+          showToast('Card loaded!', 'success');
+        } catch (error) {
+          showToast('Card loading error :( ' + error, 'error');
+          return;
+        }
+      } else {
+        // Retrieve the saved state from localStorage or use the initial state
+        savedState = JSON.parse(localStorage.getItem('languageCardsState')) || [];
+      }
+
+      // Iterate through each card and reset its state
+      const cards = document.querySelectorAll('.card');
+      cards.forEach((card, index) => {
+        card.classList.remove('flipped', 'yellow');
+      });
+
+      savedState.forEach(state => {
+        if (state.isFlipped) {
+          cards[state.id].classList.add('flipped');
+          const content = cards[state.id].querySelector('.content');
+          content.innerText = dataJson[state.id].en;
+        }
+        if (state.isYellow) {
+          cards[state.id].classList.add('yellow');
+        }
+      });
+    }
+
+    async function saveCards(online) {
+      // Save the current state of each card to localStorage
+      const cards = document.querySelectorAll('.card');
+      const stateToSave = [];
+
+      cards.forEach((card) => {
+        const isFlipped = card.classList.contains('flipped');
+        const isYellow = card.classList.contains('yellow');
+
+        if (isFlipped || isYellow) {
+          stateToSave.push({
+            id: card.id,
+            isFlipped: isFlipped,
+            isYellow: isYellow,
+          });
+        }
+      });
+      if (online) {
+        showToast('Saving cards online...', '');
+        try {
+          const response = await fetch('http://localhost:7071/api/flashcardapi', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json' // Adjust the content type based on your API requirements
+            },
+            body: JSON.stringify(stateToSave)
+          });
+          const responseText = await new Response(response.body).text();
+          if (response.status === 401) {
+            login();
+          }
+          else if (response.status != 200) {
+            throw new Error(`Error ${response.status}: ${responseText.substring(0, 20)}`);
+          }
+          showToast('Saving cards succeeded!', 'success');
+
+        } catch (error) {
+          showToast('Saving cards error :( ' + error, 'error');
+        }
+      } else {
+        localStorage.setItem('languageCardsState', JSON.stringify(stateToSave));
+      }
+    }
+
+    function toggleTooltips() {
+      // Toggle tooltips on/off
+      const tooltipStatus = document.getElementById('tooltip-status');
+      const tooltipsEnabled = tooltipStatus.innerText === '(on)';
+      tooltipStatus.innerText = tooltipsEnabled ? '(off)' : '(on)';
+    }
+
+    function showAbout() {
+      aboutDialog.style.display = 'block';
+      menuOptions.style.display = 'none';
+    }
+
+    function closeAbout() {
+      aboutDialog.style.display = 'none';
+    }
+
+    // Add click event listener to the document body
+    document.body.addEventListener('click', function (event) {
+      // Check if the clicked element is not within the menu-options div
+      if (!menuOptions.contains(event.target) && event.target.id !== 'menu') {
+        // Hide menu-options div
+        menuOptions.style.display = 'none';
+        // Prevent the click event from propagating to the body
+        event.stopPropagation();
+      }
+    });
+
+  </script>
+
+</body>
+
+</html>
