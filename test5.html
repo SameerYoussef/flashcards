@@ -169,8 +169,8 @@
       <li onclick="saveCards(false)">Local Save</li>
       <li onclick="restoreCards(false)">Local Restore</li>
       <li onclick="login()" id="login-button">Log in</li>
-      <li onclick="saveCards(true)">Online Save</li>
-      <li onclick="restoreCards(true)">Online Restore</li>
+      <li onclick="saveCards(true)" id="online-save-button">Online Save</li>
+      <li onclick="restoreCards(true)" id="online-restore-button">Online Restore</li>
       <li onclick="logout()" id="logout-button">Log out (<span id="users-name">TBC</span>)</li>
       <li onclick="toggleTooltips()">Tooltips <span id="tooltip-status">(on)</span></li>
       <li onclick="showAbout()">About</li>
@@ -251,6 +251,8 @@
     function handleLoginSuccess(name, uniqueId) {
       showToast(`Welcome ${name}!`, 'success');
       document.getElementById("login-button").style.display = "none";
+      document.getElementById("online-save-button").style.display = "block";
+      document.getElementById("online-restore-button").style.display = "block";
       document.getElementById("logout-button").style.display = "block";
       document.getElementById("users-name").innerText = name;
     }
@@ -258,6 +260,8 @@
     function handleLogoutSuccess() {
       showToast('See ya!', 'success');
       document.getElementById("login-button").style.display = "block";
+      document.getElementById("online-save-button").style.display = "none";
+      document.getElementById("online-restore-button").style.display = "none";
       document.getElementById("logout-button").style.display = "none";
       document.getElementById("users-name").innerText = '';
     }
@@ -394,6 +398,8 @@
         const content = card.querySelector('.content');
         content.innerText = dataJson[index].de;
       });
+
+      showToast('Cards reset', 'success');
     }
 
     async function restoreCards(online) {
@@ -415,7 +421,6 @@
             throw new Error(`Error ${response.status}: ${responseText.substring(0, 20)}`);
           }
           savedState = JSON.parse(responseText);
-          showToast('Card loaded!', 'success');
         } catch (error) {
           showToast('Card loading error :( ' + error, 'error');
           return;
@@ -424,6 +429,8 @@
         // Retrieve the saved state from localStorage or use the initial state
         savedState = JSON.parse(localStorage.getItem('languageCardsState')) || [];
       }
+
+      showToast('Cards loaded!', 'success');
 
       // Iterate through each card and reset its state
       const cards = document.querySelectorAll('.card');
@@ -479,14 +486,14 @@
           else if (response.status != 200) {
             throw new Error(`Error ${response.status}: ${responseText.substring(0, 20)}`);
           }
-          showToast('Saving cards succeeded!', 'success');
-
         } catch (error) {
           showToast('Saving cards error :( ' + error, 'error');
         }
       } else {
         localStorage.setItem('languageCardsState', JSON.stringify(stateToSave));
       }
+
+      showToast('Saving cards succeeded!', 'success');
     }
 
     function toggleTooltips() {
